@@ -73,8 +73,20 @@ body{flex-direction:column}
 #map{height:55vh;order:1}
 .detail-card{top:auto;bottom:50%;right:10px;width:250px}
 }
-.custom-tooltip{background:rgba(15,15,40,.95)!important;color:#fff!important;border:1px solid rgba(255,255,255,.1)!important;border-radius:8px!important;padding:6px 10px!important;font-size:12px!important;box-shadow:0 4px 12px rgba(0,0,0,.4)!important}
+.custom-tooltip{background:rgba(15,15,40,.95)!important;color:#fff!important;border:1px solid rgba(255,255,255,.1)!important;border-radius:8!important;padding:6px 10px!important;font-size:12px!important;box-shadow:0 4px 12px rgba(0,0,0,.4)!important}
 .custom-tooltip::before{border-top-color:rgba(15,15,40,.95)!important}
+.map-popup{background:rgba(15,15,40,.97);color:#fff;border-radius:12px;padding:0;min-width:220px;overflow:hidden;box-shadow:0 6px 24px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.08)}
+.map-popup .pop-header{padding:10px 14px 8px;display:flex;align-items:center;gap:10px}
+.map-popup .pop-mag{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;color:#fff;flex-shrink:0}
+.map-popup .pop-loc{font-size:13px;font-weight:600;line-height:1.3}
+.map-popup .pop-body{padding:6px 14px 12px;display:flex;flex-direction:column;gap:5px}
+.map-popup .pop-row{display:flex;align-items:center;gap:6px;font-size:11.5px;color:rgba(255,255,255,.75)}
+.map-popup .pop-row i{width:14px;text-align:center;font-size:11px;color:rgba(255,255,255,.45)}
+.map-popup .pop-row span{color:rgba(255,255,255,.95);font-weight:500}
+.map-popup .pop-tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;margin-top:4px;align-self:flex-start}
+.leaflet-popup-content-wrapper{background:transparent!important;box-shadow:none!important;padding:0!important;border-radius:12px!important}
+.leaflet-popup-content{margin:0!important;padding:0!important}
+.leaflet-popup-tip{background:rgba(15,15,40,.97)!important;box-shadow:0 4px 12px rgba(0,0,0,.4)!important}
 </style>
 </head>
 <body>
@@ -204,9 +216,31 @@ async function loadFunvisis() {
   const yyyy = hoy.getFullYear();
   const fechaHoy = `${dd}-${mm}-${yyyy}`;
 
-  // API sismosve via CORS proxy
+  // Intentar FUNVISIS directa (misma IP, puede funcionar)
   try {
-    const r = await fetch(CORS_PROXY + encodeURIComponent(SISMAPI_URL));
+    const r = await fetch(FUNVISIS_URL);
+    const d = await r.json();
+    const result = d.features.filter(f => f.properties.postalCode === fechaHoy).map(f => {
+      const c = f.geometry.coordinates;
+      return {
+        lat: parseFloat(f.properties.lat || c[1]),
+        lon: parseFloat(f.properties.long || c[0]),
+        mag: parseFloat(f.properties.phone || 0),
+        lugar: f.properties.address || 'N/A',
+        hora: normalizeTime(f.properties.city || '00:00'),
+        fecha: f.properties.postalCode || fechaHoy,
+        prof: f.properties.phoneFormatted || '?',
+        source: 'FUNVISIS'
+      };
+    });
+    if (result.length > 0) return result;
+  } catch(e) {
+    console.warn('FUNVISIS directa falló:', e);
+  }
+
+  // Fallback: JSON estático del GitHub Action (sin CORS)
+  try {
+    const r = await fetch('sismosve.json?t=' + Date.now());
     const d = await r.json();
     const result = d.features.filter(f => f.properties.date === fechaHoy).map(f => {
       const p = f.properties;
@@ -223,30 +257,10 @@ async function loadFunvisis() {
     });
     if (result.length > 0) return result;
   } catch(e) {
-    console.warn('sismosve proxy falló:', e);
+    console.warn('sismosve.json falló:', e);
   }
 
-  // Fallback: FUNVISIS directa via proxy
-  try {
-    const r = await fetch(CORS_PROXY + encodeURIComponent(FUNVISIS_URL));
-    const d = await r.json();
-    return d.features.filter(f => f.properties.postalCode === fechaHoy).map(f => {
-      const c = f.geometry.coordinates;
-      return {
-        lat: parseFloat(f.properties.lat || c[1]),
-        lon: parseFloat(f.properties.long || c[0]),
-        mag: parseFloat(f.properties.phone || 0),
-        lugar: f.properties.address || 'N/A',
-        hora: normalizeTime(f.properties.city || '00:00'),
-        fecha: f.properties.postalCode || fechaHoy,
-        prof: f.properties.phoneFormatted || '?',
-        source: 'FUNVISIS'
-      };
-    });
-  } catch(e) {
-    console.error('Todo falló:', e);
-    return [];
-  }
+  return [];
 }
 
 async function loadUSGS() {
@@ -296,8 +310,25 @@ function renderMarkers() {
     const m = L.marker([s.lat,s.lon],{icon}).addTo(map);
     m.on('click', () => selectSismo(i));
     m.on('mouseover', function() {
-      this.bindTooltip(`<b>M${s.mag}</b> ${s.lugar}`, {className:'custom-tooltip'}).openTooltip();
+      const col = getMagColor(s.mag);
+      const tagBg = s.source === 'USGS' ? 'rgba(231,76,60,.85)' : 'rgba(241,196,15,.85)';
+      const tagLabel = s.source === 'USGS' ? 'USGS GLOBAL' : 'FUNVISIS VZLA';
+      const depth = s.prof && s.prof !== '?' ? `${s.prof} km` : 'N/D';
+      const popupHtml = `<div class="map-popup">
+        <div class="pop-header">
+          <div class="pop-mag" style="background:${col}">M${s.mag.toFixed(1)}</div>
+          <div class="pop-loc">${s.lugar}</div>
+        </div>
+        <div class="pop-body">
+          <div class="pop-row"><i class="far fa-clock"></i><span>${to12h(s.hora)}</span></div>
+          <div class="pop-row"><i class="fas fa-arrow-down"></i><span>${depth}</span></div>
+          <div class="pop-row"><i class="fas fa-map-marker-alt"></i><span>${s.lat.toFixed(4)}N ${Math.abs(s.lon).toFixed(4)}O</span></div>
+          <div class="pop-tag" style="background:${tagBg}">${tagLabel}</div>
+        </div>
+      </div>`;
+      this.bindPopup(popupHtml, {className:'map-popup-wrapper', maxWidth:280, closeButton:false}).openPopup();
     });
+    m.on('mouseout', function() { map.closePopup(); });
     markers.push(m);
   });
 }
