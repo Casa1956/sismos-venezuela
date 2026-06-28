@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sismologia Venezuela - Monitoreo en Vivo</title>
+<meta name="description" content="Mapa interactivo de sismos en Venezuela. Datos oficiales de FUNVISIS y USGS. Actualizado cada 2 minutos.">
+<meta property="og:title" content="Sismologia Venezuela">
+<meta property="og:description" content="Mapa interactivo de sismos en Venezuela. Datos de FUNVISIS y USGS.">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0a0a1a;color:#fff;height:100vh;overflow:hidden;display:flex}
+#sidebar{width:320px;height:100vh;overflow-y:auto;background:linear-gradient(180deg,#0f0f2a,#12122e);border-right:1px solid rgba(255,255,255,.06);flex-shrink:0;padding:0;display:flex;flex-direction:column}
+.sidebar-header{padding:20px;background:linear-gradient(135deg,#1a1a3e,#0f0f2a);border-bottom:1px solid rgba(255,255,255,.06)}
+.sidebar-header h1{font-size:16px;font-weight:700;background:linear-gradient(135deg,#f1c40f,#f39c12);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}
+.sidebar-header .subtitle{font-size:11px;color:rgba(255,255,255,.4)}
+.stats-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.06)}
+.stat-box{text-align:center;padding:8px 4px;background:rgba(255,255,255,.03);border-radius:8px}
+.stat-box .num{font-size:22px;font-weight:700;color:#f1c40f}
+.stat-box .lbl{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.4);margin-top:2px}
+.source-tabs{display:flex;border-bottom:1px solid rgba(255,255,255,.06)}
+.source-tab{flex:1;padding:10px;text-align:center;font-size:11px;font-weight:600;cursor:pointer;color:rgba(255,255,255,.4);transition:.2s;border-bottom:2px solid transparent}
+.source-tab.active{color:#f1c40f;border-bottom-color:#f1c40f}
+.source-tab:hover{color:rgba(255,255,255,.7)}
+.sismo-list{flex:1;overflow-y:auto;padding:8px}
+.sismo-list::-webkit-scrollbar{width:4px}
+.sismo-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:4px}
+.sismo-item{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:4px;border-radius:10px;cursor:pointer;transition:all .2s;border:1px solid transparent}
+.sismo-item:hover{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.08)}
+.sismo-item.selected{background:rgba(241,196,15,.08);border-color:rgba(241,196,15,.2)}
+.sismo-item.highlight{animation:pulse-item 2s infinite}
+@keyframes pulse-item{0%,100%{background:rgba(241,196,15,.05)}50%{background:rgba(241,196,15,.12)}}
+.mag-badge{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;position:relative}
+.mag-badge.fuerte{background:linear-gradient(135deg,#e74c3c,#c0392b);box-shadow:0 0 12px rgba(231,76,60,.4)}
+.mag-badge.moderado{background:linear-gradient(135deg,#f39c12,#e67e22);box-shadow:0 0 12px rgba(243,156,18,.4)}
+.mag-badge.bajo{background:linear-gradient(135deg,#3498db,#2980b9);box-shadow:0 0 12px rgba(52,152,219,.3)}
+.mag-badge.menor{background:linear-gradient(135deg,#7f8c8d,#636e72);box-shadow:0 0 8px rgba(127,140,141,.2)}
+.mag-badge .ring{position:absolute;inset:-3px;border-radius:50%;border:2px solid rgba(255,255,255,.1)}
+.sismo-info{flex:1;min-width:0}
+.sismo-info .lugar{font-size:12px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sismo-info .meta{font-size:10px;color:rgba(255,255,255,.4);margin-top:2px;display:flex;gap:8px}
+.sismo-info .meta i{margin-right:3px}
+.sismo-source{font-size:8px;padding:2px 6px;border-radius:4px;font-weight:600;flex-shrink:0}
+.sismo-source.funvisis{background:rgba(46,204,113,.15);color:#2ecc71}
+.sismo-source.usgs{background:rgba(155,89,182,.15);color:#9b59b6}
+#map{flex:1;height:100vh}
+.map-title{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:9999;background:linear-gradient(135deg,rgba(15,15,40,.92),rgba(26,26,62,.92));backdrop-filter:blur(12px);color:white;padding:14px 40px;border-radius:14px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.08)}
+.map-title h2{font-size:18px;font-weight:700}
+.map-title .info{font-size:11px;color:rgba(255,255,255,.5);margin-top:3px}
+.detail-card{position:fixed;top:90px;right:20px;z-index:9999;width:280px;background:linear-gradient(135deg,rgba(15,15,40,.95),rgba(20,20,50,.95));backdrop-filter:blur(16px);border-radius:16px;padding:20px;color:#fff;box-shadow:0 12px 40px rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.08);display:none;animation:slideIn .3s ease}
+@keyframes slideIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+.detail-card .close{position:absolute;top:10px;right:12px;cursor:pointer;color:rgba(255,255,255,.3);font-size:16px}
+.detail-card .close:hover{color:#fff}
+.detail-card .big-mag{font-size:48px;font-weight:800;background:linear-gradient(135deg,#f1c40f,#f39c12);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1}
+.detail-card .detail-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:12px}
+.detail-card .detail-row .label{color:rgba(255,255,255,.4)}
+.detail-card .detail-row .value{font-weight:600}
+.detail-card .detail-loc{background:rgba(255,255,255,.04);border-radius:8px;padding:8px 10px;margin:8px 0;font-size:11px;border-left:3px solid #f39c12}
+.map-legend{position:fixed;bottom:20px;left:20px;z-index:9999;background:rgba(10,10,26,.92);backdrop-filter:blur(8px);padding:14px 18px;border-radius:12px;font-size:11px;border:1px solid rgba(255,255,255,.06)}
+.map-legend .title{font-weight:700;margin-bottom:8px;font-size:12px;color:#f1c40f}
+.legend-item{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.legend-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.status-bar{position:fixed;bottom:20px;right:20px;z-index:9999;background:rgba(10,10,26,.85);backdrop-filter:blur(8px);padding:8px 14px;border-radius:8px;font-size:10px;color:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.06)}
+.status-bar .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#2ecc71;margin-right:6px;animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+@media(max-width:768px){
+#sidebar{width:100%;height:45vh;order:2}
+body{flex-direction:column}
+#map{height:55vh;order:1}
+.detail-card{top:auto;bottom:50%;right:10px;width:250px}
+}
+.custom-tooltip{background:rgba(15,15,40,.95)!important;color:#fff!important;border:1px solid rgba(255,255,255,.1)!important;border-radius:8px!important;padding:6px 10px!important;font-size:12px!important;box-shadow:0 4px 12px rgba(0,0,0,.4)!important}
+.custom-tooltip::before{border-top-color:rgba(15,15,40,.95)!important}
+</style>
+</head>
+<body>
+<div id="sidebar">
+  <div class="sidebar-header">
+    <h1><i class="fas fa-wave-square"></i> SISMOLOGIA VENEZUELA</h1>
+    <div class="subtitle">FUNVISIS + USGS | Actualizado cada 2 min</div>
+  </div>
+  <div class="stats-row">
+    <div class="stat-box"><div class="num" id="totalCount">-</div><div class="lbl">Total</div></div>
+    <div class="stat-box"><div class="num" id="maxMag">-</div><div class="lbl">Max</div></div>
+    <div class="stat-box"><div class="num" id="avgMag">-</div><div class="lbl">Promedio</div></div>
+  </div>
+  <div class="source-tabs">
+    <div class="source-tab active" data-filter="all">Todos</div>
+    <div class="source-tab" data-filter="FUNVISIS">FUNVISIS</div>
+    <div class="source-tab" data-filter="USGS">USGS</div>
+  </div>
+  <div class="sismo-list" id="sismoList"></div>
+</div>
+<div id="map"></div>
+<div class="map-title">
+  <h2>SEISMOLOGIA VENEZUELA</h2>
+  <div class="info" id="mapInfo">Cargando datos...</div>
+</div>
+<div class="detail-card" id="detailCard">
+  <div class="close" onclick="closeDetail()">&times;</div>
+  <div class="big-mag" id="detailMag">-</div>
+  <div class="detail-loc" id="detailLoc">-</div>
+  <div class="detail-row"><span class="label">Fecha</span><span class="value" id="detailFecha">-</span></div>
+  <div class="detail-row"><span class="label">Hora VET</span><span class="value" id="detailHora">-</span></div>
+  <div class="detail-row"><span class="label">Profundidad</span><span class="value" id="detailProf">-</span></div>
+  <div class="detail-row"><span class="label">Coordenadas</span><span class="value" id="detailCoords">-</span></div>
+  <div class="detail-row"><span class="label">Fuente</span><span class="value" id="detailSource">-</span></div>
+</div>
+<div class="map-legend">
+  <div class="title">MAGNITUD</div>
+  <div class="legend-item"><span class="legend-dot" style="background:#e74c3c"></span>M5.0+ Fuerte</div>
+  <div class="legend-item"><span class="legend-dot" style="background:#f39c12"></span>M4.0-4.9 Moderado</div>
+  <div class="legend-item"><span class="legend-dot" style="background:#3498db"></span>M3.0-3.9 Bajo</div>
+  <div class="legend-item"><span class="legend-dot" style="background:#7f8c8d"></span>M&lt;3.0 Menor</div>
+</div>
+<div class="status-bar"><span class="dot"></span><span id="statusText">Conectando...</span></div>
+
+<script>
+const FUNVISIS_URL = 'http://www.funvisis.gob.ve/maravilla.json';
+const SISMAPI_URL = 'https://sismosve.rafnixg.dev/api/sismos';
+const USGS_URL = 'https://earthquake.usgs.gov/fdsnws/event/1/query';
+const VZ = {lat:10.4806,lon:-66.9036};
+const REFRESH = 120000;
+let map, markers = [], allSismos = [], selectedIdx = -1, activeFilter = 'all';
+
+function init() {
+  map = L.map('map', {zoomControl:false, attributionControl:false}).setView([VZ.lat, VZ.lon], 8);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    maxZoom:19
+  }).addTo(map);
+  L.control.zoom({position:'topright'}).addTo(map);
+  document.querySelectorAll('.source-tab').forEach(t => t.addEventListener('click', function() {
+    document.querySelectorAll('.source-tab').forEach(x => x.classList.remove('active'));
+    this.classList.add('active');
+    activeFilter = this.dataset.filter;
+    renderList();
+    renderMarkers();
+  }));
+  loadData();
+  setInterval(loadData, REFRESH);
+}
+
+function to12h(h24) {
+  const [h,m] = h24.split(':').map(Number);
+  if (h===0) return `12:${String(m).padStart(2,'0')} AM`;
+  if (h<12) return `${h}:${String(m).padStart(2,'0')} AM`;
+  if (h===12) return `12:${String(m).padStart(2,'0')} PM`;
+  return `${h-12}:${String(m).padStart(2,'0')} PM`;
+}
+
+function normalizeTime(t) {
+  const p = t.split(':');
+  return `${String(parseInt(p[0])).padStart(2,'0')}:${String(parseInt(p[1])).padStart(2,'0')}`;
+}
+
+function getMagClass(m) {
+  if (m>=5) return 'fuerte';
+  if (m>=4) return 'moderado';
+  if (m>=3) return 'bajo';
+  return 'menor';
+}
+
+function getMagColor(m) {
+  if (m>=5) return '#e74c3c';
+  if (m>=4) return '#f39c12';
+  if (m>=3) return '#3498db';
+  return '#7f8c8d';
+}
+
+function haversine(lat1,lon1,lat2,lon2) {
+  const R=6371, toR=Math.PI/180;
+  const dLat=(lat2-lat1)*toR, dLon=(lon2-lon1)*toR;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*toR)*Math.cos(lat2*toR)*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+function getSismoId(s) { return `${s.lat.toFixed(4)}_${s.lon.toFixed(4)}_${normalizeTime(s.hora)}`; }
+
+async function loadData() {
+  document.getElementById('statusText').textContent = 'Cargando FUNVISIS...';
+  const fv = await loadFunvisis();
+  document.getElementById('statusText').textContent = 'Cargando USGS...';
+  const ug = await loadUSGS();
+  allSismos = [...fv, ...ug];
+  allSismos.sort((a,b) => {
+    const ha = parseInt(a.hora.replace(':','')), hb = parseInt(b.hora.replace(':',''));
+    return hb - ha;
+  });
+  renderList();
+  renderMarkers();
+  updateStats();
+  document.getElementById('statusText').textContent = `Actualizado ${new Date().toLocaleTimeString('es-VE',{hour:'2-digit',minute:'2-digit'})}`;
+}
+
+async function loadFunvisis() {
+  const hoy = new Date();
+  const dd = String(hoy.getDate()).padStart(2,'0');
+  const mm = String(hoy.getMonth()+1).padStart(2,'0');
+  const yyyy = hoy.getFullYear();
+  const fechaHoy = `${dd}-${mm}-${yyyy}`;
+  const fechaHoyAlt = `${yyyy}-${mm}-${dd}`;
+
+  // Intentar API directa de FUNVISIS
+  try {
+    const r = await fetch(FUNVISIS_URL, {mode:'cors'});
+    const d = await r.json();
+    const result = d.features.filter(f => f.properties.postalCode === fechaHoy).map(f => {
+      const c = f.geometry.coordinates;
+      return {
+        lat: parseFloat(f.properties.lat || c[1]),
+        lon: parseFloat(f.properties.long || c[0]),
+        mag: parseFloat(f.properties.phone || 0),
+        lugar: f.properties.address || 'N/A',
+        hora: normalizeTime(f.properties.city || '00:00'),
+        fecha: f.properties.postalCode || fechaHoy,
+        prof: f.properties.phoneFormatted || '?',
+        source: 'FUNVISIS'
+      };
+    });
+    if (result.length > 0) return result;
+  } catch(e) {
+    console.warn('FUNVISIS directa falló, intentando sismosve API...');
+  }
+
+  // Fallback: API de sismosve.rafnixg.dev
+  try {
+    const r = await fetch(SISMAPI_URL);
+    const d = await r.json();
+    return d.features.filter(f => {
+      const p = f.properties;
+      return p.date === fechaHoy || p.date === fechaHoyAlt;
+    }).map(f => {
+      const p = f.properties;
+      return {
+        lat: parseFloat(p.lat || f.geometry.coordinates[1]),
+        lon: parseFloat(p.long || f.geometry.coordinates[0]),
+        mag: parseFloat(p.value || 0),
+        lugar: p.addressFormatted || 'N/A',
+        hora: normalizeTime(p.time || '00:00'),
+        fecha: p.date || fechaHoy,
+        prof: p.depth || '?',
+        source: 'FUNVISIS'
+      };
+    });
+  } catch(e) {
+    console.error('sismosve API también falló:', e);
+    return [];
+  }
+}
+
+async function loadUSGS() {
+  try {
+    const end = new Date();
+    const start = new Date(end - 24*60*60*1000);
+    const r = await fetch(`${USGS_URL}?format=geojson&starttime=${start.toISOString()}&endtime=${end.toISOString()}&minmagnitude=4&orderby=time&limit=50`);
+    const d = await r.json();
+    return d.features.filter(f => {
+      const [lon,lat] = f.geometry.coordinates;
+      return haversine(VZ.lat,VZ.lon,lat,lon) <= 3000;
+    }).map(f => {
+      const [lon,lat,prof] = f.geometry.coordinates;
+      const dt = new Date(f.properties.time);
+      const vet = new Date(dt - 4*3600000);
+      const hh = String(vet.getUTCHours()).padStart(2,'0');
+      const mm = String(vet.getUTCMinutes()).padStart(2,'0');
+      const dd = String(vet.getUTCDate()).padStart(2,'0');
+      const mo = String(vet.getUTCMonth()+1).padStart(2,'0');
+      return {
+        lat, lon, mag: f.properties.mag || 0,
+        lugar: f.properties.place || 'N/A',
+        hora: normalizeTime(`${hh}:${mm}`),
+        fecha: `${dd}-${mo}-${vet.getUTCFullYear()}`,
+        prof: `${Math.round(prof)} km`,
+        source: 'USGS',
+        usgsUrl: f.properties.url || ''
+      };
+    });
+  } catch(e) {
+    console.error('USGS error:', e);
+    return [];
+  }
+}
+
+function renderMarkers() {
+  markers.forEach(m => map.removeLayer(m));
+  markers = [];
+  const filtered = activeFilter === 'all' ? allSismos : allSismos.filter(s => s.source === activeFilter);
+  filtered.forEach((s,i) => {
+    const col = getMagColor(s.mag);
+    const size = selectedIdx === i ? 38 : 30;
+    const icon = L.divIcon({
+      html: `<div style="background:${col};color:#fff;border-radius:50%;width:${size}px;height:${size}px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:${selectedIdx===i?14:12}px;box-shadow:0 3px 12px rgba(0,0,0,.5);border:2px solid ${selectedIdx===i?'#f1c40f':'rgba(255,255,255,.3)'};transition:all .3s">${i+1}</div>`,
+      iconSize:[size,size], iconAnchor:[size/2,size/2], className:''
+    });
+    const m = L.marker([s.lat,s.lon],{icon}).addTo(map);
+    m.on('click', () => selectSismo(i));
+    m.on('mouseover', function() {
+      this.bindTooltip(`<b>M${s.mag}</b> ${s.lugar}`, {className:'custom-tooltip'}).openTooltip();
+    });
+    markers.push(m);
+  });
+}
+
+function renderList() {
+  const list = document.getElementById('sismoList');
+  const filtered = activeFilter === 'all' ? allSismos : allSismos.filter(s => s.source === activeFilter);
+  list.innerHTML = filtered.map((s,i) => {
+    const origIdx = allSismos.indexOf(s);
+    const cls = selectedIdx === origIdx ? 'sismo-item selected' : 'sismo-item';
+    return `<div class="${cls}" onclick="selectSismo(${origIdx})" data-idx="${origIdx}">
+      <div class="mag-badge ${getMagClass(s.mag)}"><div class="ring"></div>M${s.mag.toFixed(1)}</div>
+      <div class="sismo-info">
+        <div class="lugar">${s.lugar}</div>
+        <div class="meta">
+          <span><i class="far fa-clock"></i>${to12h(s.hora)}</span>
+          <span><i class="fas fa-arrow-down"></i>${s.prof}</span>
+        </div>
+      </div>
+      <span class="sismo-source ${s.source.toLowerCase()}">${s.source}</span>
+    </div>`;
+  }).join('');
+}
+
+function updateStats() {
+  const filtered = activeFilter === 'all' ? allSismos : allSismos.filter(s => s.source === activeFilter);
+  document.getElementById('totalCount').textContent = filtered.length;
+  if (filtered.length) {
+    const max = Math.max(...filtered.map(s=>s.mag));
+    const avg = (filtered.reduce((a,s)=>a+s.mag,0)/filtered.length);
+    document.getElementById('maxMag').textContent = `M${max.toFixed(1)}`;
+    document.getElementById('avgMag').textContent = `M${avg.toFixed(1)}`;
+    document.getElementById('mapInfo').textContent = `${filtered.length} eventos | Max: M${max.toFixed(1)} | Prom: M${avg.toFixed(1)}`;
+  }
+}
+
+function selectSismo(idx) {
+  selectedIdx = idx;
+  const s = allSismos[idx];
+  document.getElementById('detailCard').style.display = 'block';
+  document.getElementById('detailMag').textContent = `M${s.mag.toFixed(1)}`;
+  document.getElementById('detailLoc').textContent = s.lugar;
+  document.getElementById('detailFecha').textContent = s.fecha;
+  document.getElementById('detailHora').textContent = to12h(s.hora);
+  document.getElementById('detailProf').textContent = s.prof;
+  document.getElementById('detailCoords').textContent = `${s.lat.toFixed(4)}N ${Math.abs(s.lon).toFixed(4)}O`;
+  document.getElementById('detailSource').textContent = s.source;
+  map.flyTo([s.lat,s.lon], 10, {duration:1});
+  renderMarkers();
+  renderList();
+}
+
+function closeDetail() {
+  document.getElementById('detailCard').style.display = 'none';
+  selectedIdx = -1;
+  renderMarkers();
+  renderList();
+}
+
+init();
+</script>
+</body>
+</html>
