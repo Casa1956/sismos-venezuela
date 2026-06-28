@@ -123,6 +123,7 @@ body{flex-direction:column}
 const FUNVISIS_URL = 'http://www.funvisis.gob.ve/maravilla.json';
 const SISMAPI_URL = 'https://sismosve.rafnixg.dev/api/sismos';
 const USGS_URL = 'https://earthquake.usgs.gov/fdsnws/event/1/query';
+const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
 const VZ = {lat:10.4806,lon:-66.9036};
 const REFRESH = 120000;
 let map, markers = [], allSismos = [], selectedIdx = -1, activeFilter = 'all';
@@ -203,9 +204,9 @@ async function loadFunvisis() {
   const yyyy = hoy.getFullYear();
   const fechaHoy = `${dd}-${mm}-${yyyy}`;
 
-  // Primero: API sismosve (sin CORS)
+  // API sismosve via CORS proxy
   try {
-    const r = await fetch(SISMAPI_URL);
+    const r = await fetch(CORS_PROXY + encodeURIComponent(SISMAPI_URL));
     const d = await r.json();
     const result = d.features.filter(f => f.properties.date === fechaHoy).map(f => {
       const p = f.properties;
@@ -222,12 +223,12 @@ async function loadFunvisis() {
     });
     if (result.length > 0) return result;
   } catch(e) {
-    console.warn('sismosve API falló:', e);
+    console.warn('sismosve proxy falló:', e);
   }
 
-  // Segundo: API directa FUNVISIS (puede fallar por CORS)
+  // Fallback: FUNVISIS directa via proxy
   try {
-    const r = await fetch(FUNVISIS_URL, {mode:'cors'});
+    const r = await fetch(CORS_PROXY + encodeURIComponent(FUNVISIS_URL));
     const d = await r.json();
     return d.features.filter(f => f.properties.postalCode === fechaHoy).map(f => {
       const c = f.geometry.coordinates;
@@ -243,7 +244,7 @@ async function loadFunvisis() {
       };
     });
   } catch(e) {
-    console.error('FUNVISIS directa también falló:', e);
+    console.error('Todo falló:', e);
     return [];
   }
 }
