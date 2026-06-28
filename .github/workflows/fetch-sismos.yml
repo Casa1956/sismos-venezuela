@@ -1,0 +1,21 @@
+name: Fetch Sismos
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch sismosve data
+        run: |
+          curl -s "https://sismosve.rafnixg.dev/api/sismos" -o sismosve.json
+          echo "Descargados $(cat sismosve.json | python3 -c 'import json,sys;print(len(json.load(sys.stdin)["features"]))') sismos"
+      - name: Commit
+        run: |
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+          git add sismosve.json
+          git diff --cached --quiet || git commit -m "Update sismosve data $(date -u +%H:%M)" && git push
