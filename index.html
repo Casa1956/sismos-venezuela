@@ -216,33 +216,11 @@ async function loadFunvisis() {
   const yyyy = hoy.getFullYear();
   const fechaHoy = `${dd}-${mm}-${yyyy}`;
 
-  // Intentar FUNVISIS directa (misma IP, puede funcionar)
-  try {
-    const r = await fetch(FUNVISIS_URL);
-    const d = await r.json();
-    const result = d.features.filter(f => f.properties.postalCode === fechaHoy).map(f => {
-      const c = f.geometry.coordinates;
-      return {
-        lat: parseFloat(f.properties.lat || c[1]),
-        lon: parseFloat(f.properties.long || c[0]),
-        mag: parseFloat(f.properties.phone || 0),
-        lugar: f.properties.address || 'N/A',
-        hora: normalizeTime(f.properties.city || '00:00'),
-        fecha: f.properties.postalCode || fechaHoy,
-        prof: f.properties.phoneFormatted || '?',
-        source: 'FUNVISIS'
-      };
-    });
-    if (result.length > 0) return result;
-  } catch(e) {
-    console.warn('FUNVISIS directa falló:', e);
-  }
-
-  // Fallback: JSON estático del GitHub Action (sin CORS)
+  // JSON estático del GitHub Action (sin CORS)
   try {
     const r = await fetch('sismosve.json?t=' + Date.now());
     const d = await r.json();
-    const result = d.features.filter(f => f.properties.date === fechaHoy).map(f => {
+    const result = d.features.map(f => {
       const p = f.properties;
       return {
         lat: parseFloat(p.lat || f.geometry.coordinates[1]),
