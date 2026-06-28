@@ -202,38 +202,12 @@ async function loadFunvisis() {
   const mm = String(hoy.getMonth()+1).padStart(2,'0');
   const yyyy = hoy.getFullYear();
   const fechaHoy = `${dd}-${mm}-${yyyy}`;
-  const fechaHoyAlt = `${yyyy}-${mm}-${dd}`;
 
-  // Intentar API directa de FUNVISIS
-  try {
-    const r = await fetch(FUNVISIS_URL, {mode:'cors'});
-    const d = await r.json();
-    const result = d.features.filter(f => f.properties.postalCode === fechaHoy).map(f => {
-      const c = f.geometry.coordinates;
-      return {
-        lat: parseFloat(f.properties.lat || c[1]),
-        lon: parseFloat(f.properties.long || c[0]),
-        mag: parseFloat(f.properties.phone || 0),
-        lugar: f.properties.address || 'N/A',
-        hora: normalizeTime(f.properties.city || '00:00'),
-        fecha: f.properties.postalCode || fechaHoy,
-        prof: f.properties.phoneFormatted || '?',
-        source: 'FUNVISIS'
-      };
-    });
-    if (result.length > 0) return result;
-  } catch(e) {
-    console.warn('FUNVISIS directa falló, intentando sismosve API...');
-  }
-
-  // Fallback: API de sismosve.rafnixg.dev
+  // Primero: API sismosve (sin CORS)
   try {
     const r = await fetch(SISMAPI_URL);
     const d = await r.json();
-    return d.features.filter(f => {
-      const p = f.properties;
-      return p.date === fechaHoy || p.date === fechaHoyAlt;
-    }).map(f => {
+    const result = d.features.filter(f => f.properties.date === fechaHoy).map(f => {
       const p = f.properties;
       return {
         lat: parseFloat(p.lat || f.geometry.coordinates[1]),
@@ -246,8 +220,30 @@ async function loadFunvisis() {
         source: 'FUNVISIS'
       };
     });
+    if (result.length > 0) return result;
   } catch(e) {
-    console.error('sismosve API también falló:', e);
+    console.warn('sismosve API falló:', e);
+  }
+
+  // Segundo: API directa FUNVISIS (puede fallar por CORS)
+  try {
+    const r = await fetch(FUNVISIS_URL, {mode:'cors'});
+    const d = await r.json();
+    return d.features.filter(f => f.properties.postalCode === fechaHoy).map(f => {
+      const c = f.geometry.coordinates;
+      return {
+        lat: parseFloat(f.properties.lat || c[1]),
+        lon: parseFloat(f.properties.long || c[0]),
+        mag: parseFloat(f.properties.phone || 0),
+        lugar: f.properties.address || 'N/A',
+        hora: normalizeTime(f.properties.city || '00:00'),
+        fecha: f.properties.postalCode || fechaHoy,
+        prof: f.properties.phoneFormatted || '?',
+        source: 'FUNVISIS'
+      };
+    });
+  } catch(e) {
+    console.error('FUNVISIS directa también falló:', e);
     return [];
   }
 }
