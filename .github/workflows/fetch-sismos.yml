@@ -12,13 +12,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch sismosve data
+      - name: Fetch FUNVISIS data
         run: |
-          curl -s "https://sismosve.rafnixg.dev/api/sismos" -o sismosve.json
-          echo "Descargados $(cat sismosve.json | python3 -c 'import json,sys;print(len(json.load(sys.stdin)["features"]))') sismos"
+          curl -s "http://www.funvisis.gob.ve/maravilla.json" -o sismosve.json
+          COUNT=$(python3 -c "import json; print(len(json.load(open('sismosve.json'))['features']))" 2>/dev/null || echo "0")
+          echo "Descargados $COUNT sismos de FUNVISIS"
+      - name: Validate JSON
+        run: |
+          python3 -c "
+          import json, sys
+          with open('sismosve.json') as f:
+              d = json.load(f)
+          if 'features' not in d:
+              print('ERROR: No features key in JSON')
+              sys.exit(1)
+          print(f'OK: {len(d[\"features\"])} sismos validos')
+          "
       - name: Commit
         run: |
           git config user.name "GitHub Action"
           git config user.email "action@github.com"
           git add sismosve.json
-          git diff --cached --quiet || git commit -m "Update sismosve data $(date -u +%H:%M)" && git push origin main
+          git diff --cached --quiet || git commit -m "Update FUNVISIS data $(date -u +%H:%M)" && git push origin main

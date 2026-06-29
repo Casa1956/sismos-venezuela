@@ -94,7 +94,7 @@ body{flex-direction:column}
 <div id="sidebar">
   <div class="sidebar-header">
     <h1><i class="fas fa-wave-square"></i> SISMOLOGIA VENEZUELA</h1>
-    <div class="subtitle">FUNVISIS + USGS | Actualizado cada 2 min</div>
+    <div class="subtitle">FUNVISIS + USGS | Actualizado cada 5 min</div>
   </div>
   <div class="stats-row">
     <div class="stat-box"><div class="num" id="totalCount">-</div><div class="lbl">Total</div></div>
@@ -133,10 +133,7 @@ body{flex-direction:column}
 <div class="status-bar"><span class="dot"></span><span id="statusText">Conectando...</span></div>
 
 <script>
-const FUNVISIS_URL = 'http://www.funvisis.gob.ve/maravilla.json';
-const SISMAPI_URL = 'https://sismosve.rafnixg.dev/api/sismos';
 const USGS_URL = 'https://earthquake.usgs.gov/fdsnws/event/1/query';
-const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
 const VZ = {lat:10.4806,lon:-66.9036};
 const REFRESH = 120000;
 let map, markers = [], allSismos = [], selectedIdx = -1, activeFilter = 'all';
@@ -217,23 +214,40 @@ async function loadFunvisis() {
   const yyyy = hoy.getFullYear();
   const fechaHoy = `${dd}-${mm}-${yyyy}`;
 
-  // JSON estático del GitHub Action (sin CORS)
   try {
     const r = await fetch('sismosve.json?t=' + Date.now());
     const d = await r.json();
+
     const result = d.features.map(f => {
-      const p = f.properties;
+      const p = f.properties || f;
+
+      const mag = parseFloat(p.value || p.phone || 0);
+      const lugar = p.addressFormatted || p.address || 'N/A';
+      const rawTime = p.time || p.city || '00:00';
+      const fecha = p.date || p.postalCode || fechaHoy;
+      const prof = p.depth || p.phoneFormatted || '?';
+
+      let lat, lon;
+      if (p.lat && p.lng) {
+        lat = parseFloat(p.lat);
+        lon = parseFloat(p.lng);
+      } else if (f.geometry && f.geometry.coordinates) {
+        lon = f.geometry.coordinates[0];
+        lat = f.geometry.coordinates[1];
+      } else {
+        return null;
+      }
+
       return {
-        lat: parseFloat(p.lat || f.geometry.coordinates[1]),
-        lon: parseFloat(p.long || f.geometry.coordinates[0]),
-        mag: parseFloat(p.value || 0),
-        lugar: p.addressFormatted || 'N/A',
-        hora: normalizeTime(p.time || '00:00'),
-        fecha: p.date || fechaHoy,
-        prof: p.depth || '?',
+        lat, lon, mag,
+        lugar,
+        hora: normalizeTime(rawTime),
+        fecha,
+        prof: typeof prof === 'string' ? prof : `${prof} km`,
         source: 'FUNVISIS'
       };
-    });
+    }).filter(Boolean);
+
     if (result.length > 0) return result;
   } catch(e) {
     console.warn('sismosve.json falló:', e);
