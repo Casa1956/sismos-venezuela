@@ -198,8 +198,11 @@ async function loadData() {
   const ug = await loadUSGS();
   allSismos = [...fv, ...ug];
   allSismos.sort((a,b) => {
-    const ha = parseInt(a.hora.replace(':','')), hb = parseInt(b.hora.replace(':',''));
-    return hb - ha;
+    const toSortKey = s => {
+      const [d,m,y] = s.fecha.split('-');
+      return `${y}${m}${d}${s.hora.replace(':','')}`;
+    };
+    return toSortKey(b).localeCompare(toSortKey(a));
   });
   renderList();
   renderMarkers();
