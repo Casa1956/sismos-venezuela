@@ -228,9 +228,9 @@ async function loadFunvisis() {
       const prof = p.depth || p.phoneFormatted || '?';
 
       let lat, lon;
-      if (p.lat && p.lng) {
+      if (p.lat && (p.lng || p.long)) {
         lat = parseFloat(p.lat);
-        lon = parseFloat(p.lng);
+        lon = parseFloat(p.lng || p.long);
       } else if (f.geometry && f.geometry.coordinates) {
         lon = f.geometry.coordinates[0];
         lat = f.geometry.coordinates[1];
