@@ -15,7 +15,7 @@ jobs:
 
       - name: Fetch FUNVISIS via proxy
         run: |
-          curl -s "https://api.allorigins.win/raw?url=http://www.funvisis.gob.ve/maravilla.json" -o funvisis_raw.json
+          curl -s -H "User-Agent: Mozilla/5.0" "https://api.allorigins.win/raw?url=http://www.funvisis.gob.ve/maravilla.json" -o funvisis_raw.json
           python3 -c "
           import json, sys
           try:
@@ -23,7 +23,6 @@ jobs:
               if 'features' in d and len(d['features']) > 0:
                   count = len(d['features'])
                   print(f'FUNVISIS OK: {count} sismos')
-                  # Save as sismosve.json
                   with open('sismosve.json', 'w') as f:
                       json.dump(d, f, ensure_ascii=False)
                   sys.exit(0)
@@ -40,17 +39,15 @@ jobs:
         run: |
           echo "FUNVISIS fallo, usando USGS como fallback"
           END=$(date -u +%Y-%m-%d)
-          START=$(date -u -d '3 days ago' +%Y-%m-%d)
+          START=$(date -u -d '3 days ago' +%Y-%m-%d 2>/dev/null || date -u -v-3d +%Y-%m-%d)
           curl -s "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=${START}&endtime=${END}&minlatitude=0&maxlatitude=13&minlongitude=-74&maxlongitude=-60&minmagnitude=2&orderby=time&limit=100" -o usgs_raw.json
           python3 -c "
-          import json
+          import json, datetime
           d = json.load(open('usgs_raw.json'))
           features = []
           for f in d.get('features', []):
               p = f['properties']
               c = f['geometry']['coordinates']
-              # Convert USGS time to VET (UTC-4)
-              import datetime
               ts = p['time'] / 1000
               vet = datetime.datetime.utcfromtimestamp(ts) - datetime.timedelta(hours=4)
               features.append({
