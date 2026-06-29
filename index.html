@@ -2,9 +2,9 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Sismologia Venezuela - Monitoreo en Vivo</title>
-<meta name="description" content="Mapa interactivo de sismos en Venezuela. Datos oficiales de FUNVISIS y USGS. Actualizado cada 2 minutos.">
+<meta name="description" content="Mapa interactivo de sismos en Venezuela. Datos oficiales de FUNVISIS y USGS. Actualizado cada 5 minutos.">
 <meta property="og:title" content="Sismologia Venezuela">
 <meta property="og:description" content="Mapa interactivo de sismos en Venezuela. Datos de FUNVISIS y USGS.">
 <meta property="og:type" content="website">
@@ -14,92 +14,125 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:#0a0a1a;color:#fff;height:100vh;overflow:hidden;display:flex}
-#sidebar{width:320px;height:100vh;overflow-y:auto;background:linear-gradient(180deg,#0f0f2a,#12122e);border-right:1px solid rgba(255,255,255,.06);flex-shrink:0;padding:0;display:flex;flex-direction:column}
-.sidebar-header{padding:20px;background:linear-gradient(135deg,#1a1a3e,#0f0f2a);border-bottom:1px solid rgba(255,255,255,.06)}
-.sidebar-header h1{font-size:16px;font-weight:700;background:linear-gradient(135deg,#f1c40f,#f39c12);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}
-.sidebar-header .subtitle{font-size:11px;color:rgba(255,255,255,.4)}
-.stats-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.06)}
-.stat-box{text-align:center;padding:8px 4px;background:rgba(255,255,255,.03);border-radius:8px}
-.stat-box .num{font-size:22px;font-weight:700;color:#f1c40f}
-.stat-box .lbl{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.4);margin-top:2px}
+
+/* === SIDEBAR === */
+#sidebar{width:320px;height:100vh;overflow-y:auto;background:linear-gradient(180deg,#0f0f2a,#12122e);border-right:1px solid rgba(255,255,255,.06);flex-shrink:0;display:flex;flex-direction:column}
+.sidebar-header{padding:16px 16px 12px;background:linear-gradient(135deg,#1a1a3e,#0f0f2a);border-bottom:1px solid rgba(255,255,255,.06)}
+.sidebar-header h1{font-size:14px;font-weight:700;background:linear-gradient(135deg,#f1c40f,#f39c12);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:2px}
+.sidebar-header .subtitle{font-size:10px;color:rgba(255,255,255,.4)}
+.stats-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.06)}
+.stat-box{text-align:center;padding:6px 2px;background:rgba(255,255,255,.03);border-radius:6px}
+.stat-box .num{font-size:18px;font-weight:700;color:#f1c40f}
+.stat-box .lbl{font-size:8px;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.4);margin-top:1px}
 .source-tabs{display:flex;border-bottom:1px solid rgba(255,255,255,.06)}
-.source-tab{flex:1;padding:10px;text-align:center;font-size:11px;font-weight:600;cursor:pointer;color:rgba(255,255,255,.4);transition:.2s;border-bottom:2px solid transparent}
+.source-tab{flex:1;padding:8px;text-align:center;font-size:10px;font-weight:600;cursor:pointer;color:rgba(255,255,255,.4);transition:.2s;border-bottom:2px solid transparent}
 .source-tab.active{color:#f1c40f;border-bottom-color:#f1c40f}
 .source-tab:hover{color:rgba(255,255,255,.7)}
-.sismo-list{flex:1;overflow-y:auto;padding:8px}
-.sismo-list::-webkit-scrollbar{width:4px}
-.sismo-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:4px}
-.sismo-item{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:4px;border-radius:10px;cursor:pointer;transition:all .2s;border:1px solid transparent}
+.sismo-list{flex:1;overflow-y:auto;padding:6px}
+.sismo-list::-webkit-scrollbar{width:3px}
+.sismo-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px}
+.sismo-item{display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:3px;border-radius:8px;cursor:pointer;transition:all .2s;border:1px solid transparent}
 .sismo-item:hover{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.08)}
 .sismo-item.selected{background:rgba(241,196,15,.08);border-color:rgba(241,196,15,.2)}
-.sismo-item.highlight{animation:pulse-item 2s infinite}
-@keyframes pulse-item{0%,100%{background:rgba(241,196,15,.05)}50%{background:rgba(241,196,15,.12)}}
-.mag-badge{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;position:relative}
-.mag-badge.fuerte{background:linear-gradient(135deg,#e74c3c,#c0392b);box-shadow:0 0 12px rgba(231,76,60,.4)}
-.mag-badge.moderado{background:linear-gradient(135deg,#f39c12,#e67e22);box-shadow:0 0 12px rgba(243,156,18,.4)}
-.mag-badge.bajo{background:linear-gradient(135deg,#3498db,#2980b9);box-shadow:0 0 12px rgba(52,152,219,.3)}
-.mag-badge.menor{background:linear-gradient(135deg,#7f8c8d,#636e72);box-shadow:0 0 8px rgba(127,140,141,.2)}
-.mag-badge .ring{position:absolute;inset:-3px;border-radius:50%;border:2px solid rgba(255,255,255,.1)}
+.mag-badge{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;flex-shrink:0}
+.mag-badge.fuerte{background:linear-gradient(135deg,#e74c3c,#c0392b);box-shadow:0 0 10px rgba(231,76,60,.4)}
+.mag-badge.moderado{background:linear-gradient(135deg,#f39c12,#e67e22);box-shadow:0 0 10px rgba(243,156,18,.4)}
+.mag-badge.bajo{background:linear-gradient(135deg,#3498db,#2980b9);box-shadow:0 0 10px rgba(52,152,219,.3)}
+.mag-badge.menor{background:linear-gradient(135deg,#7f8c8d,#636e72);box-shadow:0 0 6px rgba(127,140,141,.2)}
 .sismo-info{flex:1;min-width:0}
-.sismo-info .lugar{font-size:12px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sismo-info .meta{font-size:10px;color:rgba(255,255,255,.4);margin-top:2px;display:flex;gap:8px}
-.sismo-info .meta i{margin-right:3px}
-.sismo-source{font-size:8px;padding:2px 6px;border-radius:4px;font-weight:600;flex-shrink:0}
+.sismo-info .lugar{font-size:11px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sismo-info .meta{font-size:9px;color:rgba(255,255,255,.4);margin-top:1px;display:flex;gap:6px}
+.sismo-info .meta i{margin-right:2px}
+.sismo-source{font-size:7px;padding:2px 5px;border-radius:3px;font-weight:600;flex-shrink:0}
 .sismo-source.funvisis{background:rgba(46,204,113,.15);color:#2ecc71}
 .sismo-source.usgs{background:rgba(155,89,182,.15);color:#9b59b6}
+
+/* === MAP === */
 #map{flex:1;height:100vh}
-.map-title{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:9999;background:linear-gradient(135deg,rgba(15,15,40,.92),rgba(26,26,62,.92));backdrop-filter:blur(12px);color:white;padding:14px 40px;border-radius:14px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.08)}
-.map-title h2{font-size:18px;font-weight:700}
-.map-title .info{font-size:11px;color:rgba(255,255,255,.5);margin-top:3px}
-.detail-card{position:fixed;top:90px;right:20px;z-index:9999;width:280px;background:linear-gradient(135deg,rgba(15,15,40,.95),rgba(20,20,50,.95));backdrop-filter:blur(16px);border-radius:16px;padding:20px;color:#fff;box-shadow:0 12px 40px rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.08);display:none;animation:slideIn .3s ease}
-@keyframes slideIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
-.detail-card .close{position:absolute;top:10px;right:12px;cursor:pointer;color:rgba(255,255,255,.3);font-size:16px}
+
+/* === MAP TITLE === */
+.map-title{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:9999;background:linear-gradient(135deg,rgba(15,15,40,.92),rgba(26,26,62,.92));backdrop-filter:blur(12px);color:white;padding:8px 20px;border-radius:10px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.08)}
+.map-title h2{font-size:13px;font-weight:700}
+.map-title .info{font-size:9px;color:rgba(255,255,255,.5);margin-top:2px}
+
+/* === DETAIL CARD === */
+.detail-card{position:fixed;top:60px;right:12px;z-index:9999;width:240px;background:linear-gradient(135deg,rgba(15,15,40,.95),rgba(20,20,50,.95));backdrop-filter:blur(16px);border-radius:12px;padding:14px;color:#fff;box-shadow:0 8px 30px rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.08);display:none;animation:slideIn .3s ease}
+@keyframes slideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.detail-card .close{position:absolute;top:8px;right:10px;cursor:pointer;color:rgba(255,255,255,.3);font-size:14px}
 .detail-card .close:hover{color:#fff}
-.detail-card .big-mag{font-size:48px;font-weight:800;background:linear-gradient(135deg,#f1c40f,#f39c12);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1}
-.detail-card .detail-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:12px}
+.detail-card .big-mag{font-size:36px;font-weight:800;background:linear-gradient(135deg,#f1c40f,#f39c12);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1}
+.detail-card .detail-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:10px}
 .detail-card .detail-row .label{color:rgba(255,255,255,.4)}
 .detail-card .detail-row .value{font-weight:600}
-.detail-card .detail-loc{background:rgba(255,255,255,.04);border-radius:8px;padding:8px 10px;margin:8px 0;font-size:11px;border-left:3px solid #f39c12}
-.map-legend{position:fixed;bottom:20px;left:20px;z-index:9999;background:rgba(10,10,26,.92);backdrop-filter:blur(8px);padding:14px 18px;border-radius:12px;font-size:11px;border:1px solid rgba(255,255,255,.06)}
-.map-legend .title{font-weight:700;margin-bottom:8px;font-size:12px;color:#f1c40f}
-.legend-item{display:flex;align-items:center;gap:8px;margin-bottom:5px}
-.legend-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
-.status-bar{position:fixed;bottom:20px;right:20px;z-index:9999;background:rgba(10,10,26,.85);backdrop-filter:blur(8px);padding:8px 14px;border-radius:8px;font-size:10px;color:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.06)}
-.status-bar .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#2ecc71;margin-right:6px;animation:blink 2s infinite}
+.detail-card .detail-loc{background:rgba(255,255,255,.04);border-radius:6px;padding:6px 8px;margin:6px 0;font-size:10px;border-left:3px solid #f39c12}
+
+/* === MAP LEGEND === */
+.map-legend{position:fixed;bottom:12px;left:12px;z-index:9999;background:rgba(10,10,26,.92);backdrop-filter:blur(8px);padding:10px 14px;border-radius:10px;font-size:10px;border:1px solid rgba(255,255,255,.06)}
+.map-legend .title{font-weight:700;margin-bottom:6px;font-size:11px;color:#f1c40f}
+.legend-item{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+.legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+
+/* === STATUS BAR === */
+.status-bar{position:fixed;bottom:12px;right:12px;z-index:9999;background:rgba(10,10,26,.85);backdrop-filter:blur(8px);padding:6px 10px;border-radius:6px;font-size:9px;color:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.06)}
+.status-bar .dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:#2ecc71;margin-right:4px;animation:blink 2s infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* === MOBILE === */
 @media(max-width:768px){
-#sidebar{width:100%;height:45vh;order:2}
-body{flex-direction:column}
-#map{height:55vh;order:1}
-.detail-card{top:auto;bottom:50%;right:10px;width:250px}
-.map-legend{display:none}
+  body{flex-direction:column}
+  #sidebar{width:100%;height:40vh;order:2;border-right:none;border-top:1px solid rgba(255,255,255,.06)}
+  #map{height:60vh;order:1}
+  .map-title{top:6px;padding:6px 14px}
+  .map-title h2{font-size:11px}
+  .map-title .info{font-size:8px}
+  .detail-card{top:auto;bottom:42vh;right:8px;width:200px;padding:10px}
+  .detail-card .big-mag{font-size:28px}
+  .detail-card .detail-row{font-size:9px;padding:3px 0}
+  .detail-card .detail-loc{font-size:9px;padding:5px 6px;margin:4px 0}
+  .map-legend{bottom:42vh;left:8px;padding:8px 10px;font-size:9px}
+  .map-legend .title{font-size:10px;margin-bottom:4px}
+  .legend-item{margin-bottom:2px}
+  .legend-dot{width:8px;height:8px}
+  .status-bar{bottom:auto;top:6px;right:8px;padding:4px 8px;font-size:8px}
+  .sismo-item{padding:6px 8px;gap:6px}
+  .mag-badge{width:30px;height:30px;font-size:10px}
+  .sismo-info .lugar{font-size:10px}
+  .sismo-info .meta{font-size:8px}
 }
-.custom-tooltip{background:rgba(15,15,40,.95)!important;color:#fff!important;border:1px solid rgba(255,255,255,.1)!important;border-radius:8!important;padding:6px 10px!important;font-size:12px!important;box-shadow:0 4px 12px rgba(0,0,0,.4)!important}
-.custom-tooltip::before{border-top-color:rgba(15,15,40,.95)!important}
-.map-popup{background:rgba(15,15,40,.97);color:#fff;border-radius:12px;padding:0;min-width:220px;overflow:hidden;box-shadow:0 6px 24px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.08)}
-.map-popup .pop-header{padding:10px 14px 8px;display:flex;align-items:center;gap:10px}
-.map-popup .pop-mag{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;color:#fff;flex-shrink:0}
-.map-popup .pop-loc{font-size:13px;font-weight:600;line-height:1.3}
-.map-popup .pop-body{padding:6px 14px 12px;display:flex;flex-direction:column;gap:5px}
-.map-popup .pop-row{display:flex;align-items:center;gap:6px;font-size:11.5px;color:rgba(255,255,255,.75)}
-.map-popup .pop-row i{width:14px;text-align:center;font-size:11px;color:rgba(255,255,255,.45)}
+
+/* === POPUP === */
+.map-popup{background:rgba(15,15,40,.97);color:#fff;border-radius:10px;padding:0;min-width:200px;max-width:240px;overflow:hidden;box-shadow:0 6px 24px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.08)}
+.map-popup .pop-header{padding:8px 12px 6px;display:flex;align-items:center;gap:8px}
+.map-popup .pop-mag{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;color:#fff;flex-shrink:0}
+.map-popup .pop-loc{font-size:11px;font-weight:600;line-height:1.2}
+.map-popup .pop-body{padding:4px 12px 10px;display:flex;flex-direction:column;gap:3px}
+.map-popup .pop-row{display:flex;align-items:center;gap:5px;font-size:10px;color:rgba(255,255,255,.75)}
+.map-popup .pop-row i{width:12px;text-align:center;font-size:9px;color:rgba(255,255,255,.45)}
 .map-popup .pop-row span{color:rgba(255,255,255,.95);font-weight:500}
-.map-popup .pop-tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;margin-top:4px;align-self:flex-start}
-.leaflet-popup-content-wrapper{background:transparent!important;box-shadow:none!important;padding:0!important;border-radius:12px!important}
+.map-popup .pop-tag{display:inline-block;padding:2px 6px;border-radius:8px;font-size:8px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;margin-top:3px;align-self:flex-start}
+.leaflet-popup-content-wrapper{background:transparent!important;box-shadow:none!important;padding:0!important;border-radius:10px!important}
 .leaflet-popup-content{margin:0!important;padding:0!important}
 .leaflet-popup-tip{background:rgba(15,15,40,.97)!important;box-shadow:0 4px 12px rgba(0,0,0,.4)!important}
+@media(max-width:768px){
+  .map-popup{min-width:180px;max-width:200px}
+  .map-popup .pop-header{padding:6px 10px 4px;gap:6px}
+  .map-popup .pop-mag{width:34px;height:34px;font-size:13px}
+  .map-popup .pop-loc{font-size:10px}
+  .map-popup .pop-body{padding:3px 10px 8px}
+  .map-popup .pop-row{font-size:9px}
+}
 </style>
 </head>
 <body>
 <div id="sidebar">
   <div class="sidebar-header">
     <h1><i class="fas fa-wave-square"></i> SISMOLOGIA VENEZUELA</h1>
-    <div class="subtitle">FUNVISIS + USGS | Actualizado cada 5 min</div>
+    <div class="subtitle">FUNVISIS + USGS | Cada 5 min</div>
   </div>
   <div class="stats-row">
     <div class="stat-box"><div class="num" id="totalCount">-</div><div class="lbl">Total</div></div>
     <div class="stat-box"><div class="num" id="maxMag">-</div><div class="lbl">Max</div></div>
-    <div class="stat-box"><div class="num" id="avgMag">-</div><div class="lbl">Promedio</div></div>
+    <div class="stat-box"><div class="num" id="avgMag">-</div><div class="lbl">Prom</div></div>
   </div>
   <div class="source-tabs">
     <div class="source-tab active" data-filter="all">Todos</div>
@@ -136,13 +169,11 @@ body{flex-direction:column}
 const USGS_URL = 'https://earthquake.usgs.gov/fdsnws/event/1/query';
 const VZ = {lat:10.4806,lon:-66.9036};
 const REFRESH = 120000;
-let map, markers = [], allSismos = [], selectedIdx = -1, activeFilter = 'all';
+let map, markers = [], circles = [], allSismos = [], selectedIdx = -1, activeFilter = 'all';
 
 function init() {
   map = L.map('map', {zoomControl:false, attributionControl:false}).setView([VZ.lat, VZ.lon], 8);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    maxZoom:19
-  }).addTo(map);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {maxZoom:19}).addTo(map);
   L.control.zoom({position:'topright'}).addTo(map);
   document.querySelectorAll('.source-tab').forEach(t => t.addEventListener('click', function() {
     document.querySelectorAll('.source-tab').forEach(x => x.classList.remove('active'));
@@ -191,6 +222,14 @@ function haversine(lat1,lon1,lat2,lon2) {
 
 function getSismoId(s) { return `${s.lat.toFixed(4)}_${s.lon.toFixed(4)}_${normalizeTime(s.hora)}`; }
 
+function getTimeDiffMinutes(s) {
+  const now = new Date();
+  const [d,m,y] = s.fecha.split('-');
+  const [h,mi] = s.hora.split(':').map(Number);
+  const sismoTime = new Date(y, m-1, d, h, mi);
+  return (now - sismoTime) / 60000;
+}
+
 async function loadData() {
   document.getElementById('statusText').textContent = 'Cargando FUNVISIS...';
   const fv = await loadFunvisis();
@@ -216,20 +255,16 @@ async function loadFunvisis() {
   const mm = String(hoy.getMonth()+1).padStart(2,'0');
   const yyyy = hoy.getFullYear();
   const fechaHoy = `${dd}-${mm}-${yyyy}`;
-
   try {
     const r = await fetch('sismosve.json?t=' + Date.now());
     const d = await r.json();
-
     const result = d.features.map(f => {
       const p = f.properties || f;
-
       const mag = parseFloat(p.value || p.phone || 0);
       const lugar = p.addressFormatted || p.address || 'N/A';
       const rawTime = p.time || p.city || '00:00';
       const fecha = p.date || p.postalCode || fechaHoy;
       const prof = p.depth || p.phoneFormatted || '?';
-
       let lat, lon;
       if (p.lat && (p.lng || p.long)) {
         lat = parseFloat(p.lat);
@@ -237,25 +272,11 @@ async function loadFunvisis() {
       } else if (f.geometry && f.geometry.coordinates) {
         lon = f.geometry.coordinates[0];
         lat = f.geometry.coordinates[1];
-      } else {
-        return null;
-      }
-
-      return {
-        lat, lon, mag,
-        lugar,
-        hora: normalizeTime(rawTime),
-        fecha,
-        prof: typeof prof === 'string' ? prof : `${prof} km`,
-        source: 'FUNVISIS'
-      };
+      } else { return null; }
+      return { lat, lon, mag, lugar, hora: normalizeTime(rawTime), fecha, prof: typeof prof === 'string' ? prof : `${prof} km`, source: 'FUNVISIS' };
     }).filter(Boolean);
-
     if (result.length > 0) return result;
-  } catch(e) {
-    console.warn('sismosve.json falló:', e);
-  }
-
+  } catch(e) { console.warn('sismosve.json falló:', e); }
   return [];
 }
 
@@ -276,40 +297,56 @@ async function loadUSGS() {
       const mm = String(vet.getUTCMinutes()).padStart(2,'0');
       const dd = String(vet.getUTCDate()).padStart(2,'0');
       const mo = String(vet.getUTCMonth()+1).padStart(2,'0');
-      return {
-        lat, lon, mag: f.properties.mag || 0,
-        lugar: f.properties.place || 'N/A',
-        hora: normalizeTime(`${hh}:${mm}`),
-        fecha: `${dd}-${mo}-${vet.getUTCFullYear()}`,
-        prof: `${Math.round(prof)} km`,
-        source: 'USGS',
-        usgsUrl: f.properties.url || ''
-      };
+      return { lat, lon, mag: f.properties.mag || 0, lugar: f.properties.place || 'N/A', hora: normalizeTime(`${hh}:${mm}`), fecha: `${dd}-${mo}-${vet.getUTCFullYear()}`, prof: `${Math.round(prof)} km`, source: 'USGS', usgsUrl: f.properties.url || '' };
     });
-  } catch(e) {
-    console.error('USGS error:', e);
-    return [];
-  }
+  } catch(e) { console.error('USGS error:', e); return []; }
 }
 
 function renderMarkers() {
   markers.forEach(m => map.removeLayer(m));
+  circles.forEach(c => map.removeLayer(c));
   markers = [];
+  circles = [];
   const filtered = activeFilter === 'all' ? allSismos : allSismos.filter(s => s.source === activeFilter);
-  filtered.forEach((s,i) => {
+  const total = filtered.length;
+
+  // Render oldest first, newest last (so newest appear on top)
+  const reversed = [...filtered].reverse();
+  reversed.forEach((s, ri) => {
+    const i = total - 1 - ri; // original index
     const col = getMagColor(s.mag);
-    const size = selectedIdx === i ? 38 : 30;
+    const isSelected = selectedIdx === i;
+    const ageMin = getTimeDiffMinutes(s);
+    // Opacity: 1.0 for new (<1h), fading to 0.4 for old (>12h)
+    const opacity = Math.max(0.4, 1.0 - (ageMin / 720) * 0.6);
+    // Size: bigger for newer
+    const baseSize = isSelected ? 36 : (ageMin < 60 ? 28 : (ageMin < 360 ? 22 : 18));
+    const zIndex = isSelected ? 10000 : (total - i);
+
+    // Numbered marker
     const icon = L.divIcon({
-      html: `<div style="background:${col};color:#fff;border-radius:50%;width:${size}px;height:${size}px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:${selectedIdx===i?14:12}px;box-shadow:0 3px 12px rgba(0,0,0,.5);border:2px solid ${selectedIdx===i?'#f1c40f':'rgba(255,255,255,.3)'};transition:all .3s">${i+1}</div>`,
-      iconSize:[size,size], iconAnchor:[size/2,size/2], className:''
+      html: `<div style="background:${col};color:#fff;border-radius:50%;width:${baseSize}px;height:${baseSize}px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:${isSelected?13:10}px;box-shadow:0 2px 8px rgba(0,0,0,.5);border:2px solid ${isSelected?'#f1c40f':'rgba(255,255,255,.25)'};opacity:${opacity};transition:all .3s">${i+1}</div>`,
+      iconSize:[baseSize,baseSize], iconAnchor:[baseSize/2,baseSize/2], className:''
     });
-    const m = L.marker([s.lat,s.lon],{icon}).addTo(map);
+    const m = L.marker([s.lat,s.lon],{icon, zIndexOffset:zIndex}).addTo(map);
+
+    // Circle around marker
+    const radius = s.mag >= 5 ? 40000 : (s.mag >= 4 ? 30000 : (s.mag >= 3 ? 20000 : 12000));
+    const circle = L.circle([s.lat,s.lon],{
+      color: col,
+      fillColor: col,
+      fillOpacity: isSelected ? 0.15 : (opacity * 0.08),
+      radius: radius,
+      weight: isSelected ? 2 : 1,
+      opacity: isSelected ? 0.6 : (opacity * 0.3)
+    }).addTo(map);
+
     m.on('click', () => selectSismo(i));
+    m.on('touchend', (e) => { e.originalEvent.preventDefault(); selectSismo(i); });
     m.on('mouseover', function() {
-      const col = getMagColor(s.mag);
       const tagBg = s.source === 'USGS' ? 'rgba(231,76,60,.85)' : 'rgba(241,196,15,.85)';
       const tagLabel = s.source === 'USGS' ? 'USGS GLOBAL' : 'FUNVISIS VZLA';
-      const depth = s.prof && s.prof !== '?' ? `${s.prof} km` : 'N/D';
+      const depth = s.prof && s.prof !== '?' ? `${s.prof}` : 'N/D';
       const popupHtml = `<div class="map-popup">
         <div class="pop-header">
           <div class="pop-mag" style="background:${col}">M${s.mag.toFixed(1)}</div>
@@ -322,10 +359,11 @@ function renderMarkers() {
           <div class="pop-tag" style="background:${tagBg}">${tagLabel}</div>
         </div>
       </div>`;
-      this.bindPopup(popupHtml, {className:'map-popup-wrapper', maxWidth:280, closeButton:false}).openPopup();
+      this.bindPopup(popupHtml, {className:'map-popup-wrapper', maxWidth:240, closeButton:false, autoPanPadding:[40,40]}).openPopup();
     });
     m.on('mouseout', function() { map.closePopup(); });
     markers.push(m);
+    circles.push(circle);
   });
 }
 
@@ -336,7 +374,7 @@ function renderList() {
     const origIdx = allSismos.indexOf(s);
     const cls = selectedIdx === origIdx ? 'sismo-item selected' : 'sismo-item';
     return `<div class="${cls}" onclick="selectSismo(${origIdx})" data-idx="${origIdx}">
-      <div class="mag-badge ${getMagClass(s.mag)}"><div class="ring"></div>M${s.mag.toFixed(1)}</div>
+      <div class="mag-badge ${getMagClass(s.mag)}">M${s.mag.toFixed(1)}</div>
       <div class="sismo-info">
         <div class="lugar">${s.lugar}</div>
         <div class="meta">
