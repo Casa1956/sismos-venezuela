@@ -12,25 +12,70 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch FUNVISIS data
+
+      - name: Fetch FUNVISIS via proxy
         run: |
-          curl -s "http://www.funvisis.gob.ve/maravilla.json" -o sismosve.json
-          COUNT=$(python3 -c "import json; print(len(json.load(open('sismosve.json'))['features']))" 2>/dev/null || echo "0")
-          echo "Descargados $COUNT sismos de FUNVISIS"
-      - name: Validate JSON
-        run: |
+          curl -s "https://api.allorigins.win/raw?url=http://www.funvisis.gob.ve/maravilla.json" -o funvisis_raw.json
           python3 -c "
           import json, sys
-          with open('sismosve.json') as f:
-              d = json.load(f)
-          if 'features' not in d:
-              print('ERROR: No features key in JSON')
+          try:
+              d = json.load(open('funvisis_raw.json'))
+              if 'features' in d and len(d['features']) > 0:
+                  count = len(d['features'])
+                  print(f'FUNVISIS OK: {count} sismos')
+                  # Save as sismosve.json
+                  with open('sismosve.json', 'w') as f:
+                      json.dump(d, f, ensure_ascii=False)
+                  sys.exit(0)
+              else:
+                  print('FUNVISIS: JSON vacio o sin features')
+                  sys.exit(1)
+          except Exception as e:
+              print(f'FUNVISIS ERROR: {e}')
               sys.exit(1)
-          print(f'OK: {len(d[\"features\"])} sismos validos')
           "
+
+      - name: Fetch USGS fallback
+        if: failure()
+        run: |
+          echo "FUNVISIS fallo, usando USGS como fallback"
+          END=$(date -u +%Y-%m-%d)
+          START=$(date -u -d '3 days ago' +%Y-%m-%d)
+          curl -s "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=${START}&endtime=${END}&minlatitude=0&maxlatitude=13&minlongitude=-74&maxlongitude=-60&minmagnitude=2&orderby=time&limit=100" -o usgs_raw.json
+          python3 -c "
+          import json
+          d = json.load(open('usgs_raw.json'))
+          features = []
+          for f in d.get('features', []):
+              p = f['properties']
+              c = f['geometry']['coordinates']
+              # Convert USGS time to VET (UTC-4)
+              import datetime
+              ts = p['time'] / 1000
+              vet = datetime.datetime.utcfromtimestamp(ts) - datetime.timedelta(hours=4)
+              features.append({
+                  'type': 'Sismo',
+                  'geometry': {'type': 'Point', 'coordinates': [c[0], c[1]], 'marcador': 'marker'},
+                  'properties': {
+                      'depth': f'{round(c[2])} km',
+                      'value': str(p.get('mag', 0)),
+                      'addressFormatted': p.get('place', 'N/A'),
+                      'time': vet.strftime('%H:%M'),
+                      'country': 'Venezuela',
+                      'date': vet.strftime('%d-%m-%Y'),
+                      'lat': f'{c[1]:.2f}',
+                      'long': f'{c[0]:.2f}'
+                  }
+              })
+          out = {'type': 'sismos', 'features': features}
+          with open('sismosve.json', 'w') as f:
+              json.dump(out, f, ensure_ascii=False)
+          print(f'USGS fallback: {len(features)} sismos')
+          "
+
       - name: Commit
         run: |
           git config user.name "GitHub Action"
           git config user.email "action@github.com"
           git add sismosve.json
-          git diff --cached --quiet || git commit -m "Update FUNVISIS data $(date -u +%H:%M)" && git push origin main
+          git diff --cached --quiet || git commit -m "Update sismos $(date -u +%H:%M)" && git push origin main
