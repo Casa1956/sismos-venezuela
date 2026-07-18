@@ -275,7 +275,7 @@ async function loadFunvisis() {
         lat = f.geometry.coordinates[1];
       } else { return null; }
       return { lat, lon, mag, lugar, hora: normalizeTime(rawTime), fecha, prof: typeof prof === 'string' ? prof : `${prof} km`, source: 'FUNVISIS' };
-    }).filter(Boolean);
+    }).filter(Boolean).filter(s => s.fecha === fechaHoy);
     if (result.length > 0) return result;
   } catch(e) { console.warn('sismosve.json falló:', e); }
   return [];
@@ -284,7 +284,7 @@ async function loadFunvisis() {
 async function loadUSGS() {
   try {
     const end = new Date();
-    const start = new Date(end - 24*60*60*1000);
+    const start = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 0, 0, 0);
     const r = await fetch(`${USGS_URL}?format=geojson&starttime=${start.toISOString()}&endtime=${end.toISOString()}&minmagnitude=4&orderby=time&limit=50`);
     const d = await r.json();
     return d.features.filter(f => {
